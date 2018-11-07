@@ -16,7 +16,7 @@ import math
 import typing
 from dataclasses import dataclass
 from logging import getLogger
-from PyQt5.QtWidgets import QWidget, QCheckBox, QComboBox, QLabel
+from PyQt5.QtWidgets import QWidget, QCheckBox, QComboBox, QLabel, QPushButton
 
 from kucher.view.device_model_representation import Commander, GeneralStatusView, ControlMode, TaskID, \
     TaskSpecificStatusReport, get_human_friendly_control_mode_name_and_its_icon_name
@@ -59,6 +59,9 @@ class RunControlWidget(SpecializedControlWidgetBase):
         self._setpoint_control.status_tip = self._setpoint_control.tool_tip
         self._setpoint_control.value_change_event.connect(self._on_setpoint_changed)
 
+        self._setpoint_apply_control = QPushButton(self)
+        self._setpoint_apply_control.clicked.connect(self._on_apply_button_clicked)
+
         self._mode_selector = QComboBox(self)
         self._mode_selector.setEditable(False)
         self._mode_selector.currentIndexChanged.connect(lambda *_: self._on_control_mode_changed())
@@ -78,6 +81,7 @@ class RunControlWidget(SpecializedControlWidgetBase):
                     (self._setpoint_control.spinbox, 1),
                     (None, 1),
                     self._guru_mode_checkbox,
+                    self._setpoint_apply_control,
                 ),
                 self._setpoint_control.slider,
                 (None, 1)
@@ -116,13 +120,18 @@ class RunControlWidget(SpecializedControlWidgetBase):
         cp = self._get_current_control_policy()
         value = self._setpoint_control.value
         if cp.is_ratiometric:
-            value *= 0.01           # Percent scaling
-
-        self._launch_async(self._commander.run(mode=cp.mode, value=value))
+            value *= 0.01         # Percent scaling
+            self._launch_async(self._commander.run(mode=cp.mode, value=value))
 
     def _on_setpoint_changed(self, _value: float):
         if self.isEnabled():
             self._emit_setpoint()
+
+    def _on_apply_button_clicked(self):
+        cp = self._get_current_control_policy()
+        value = self._setpoint_control.value
+        if ~cp.is_ratiometric:
+            self._launch_async(self._commander.run(mode=cp.mode, value=value))
 
     def _on_control_mode_changed(self):
         cp = self._get_current_control_policy()
